@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#667eea">
+  <title>カウントダウン</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
+      background: #f0f4f8;
+      min-height: 100dvh;
+      padding-bottom: calc(16px + var(--safe-bottom));
+    }
+
+    header {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      padding: calc(12px + var(--safe-top)) 16px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(102,126,234,0.4);
+    }
+
+    header h1 { font-size: 1.1rem; font-weight: 700; }
+
+    .notif-btn {
+      background: rgba(255,255,255,0.2);
+      border: none; color: #fff; cursor: pointer;
+      width: 36px; height: 36px; border-radius: 10px;
+      font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .notif-btn:active { background: rgba(255,255,255,0.35); }
+
+    main { padding: 16px; max-width: 520px; margin: 0 auto; }
+
+    /* 入力フォーム */
+    .input-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      margin-bottom: 16px;
+    }
+
+    .input-card h2 { font-size: 0.85rem; font-weight: 700; color: #718096; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .field { margin-bottom: 10px; }
+    .field label { display: block; font-size: 0.72rem; font-weight: 700; color: #718096; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .two-col { display: flex; gap: 10px; }
+    .two-col .field { flex: 1; }
+
+    input[type="text"], input[type="date"] {
+      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px;
+      padding: 12px 14px; font-size: 1rem; color: #1a202c;
+      background: #fff; outline: none; transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    input:focus { border-color: #667eea; }
+    input.error { border-color: #fc8181; }
+
+    .emoji-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .emoji-btn {
+      width: 40px; height: 40px; border-radius: 10px; border: 2px solid #e2e8f0;
+      background: #f7fafc; font-size: 1.3rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .emoji-btn.selected { border-color: #667eea; background: #ebf4ff; }
+    .emoji-btn:active { background: #e2e8f0; }
+
+    .add-btn {
+      width: 100%; background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff; border: none; border-radius: 12px; height: 48px;
+      font-size: 1rem; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .add-btn:active { opacity: 0.85; transform: scale(0.98); }
+
+    /* カード一覧 */
+    .list-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 4px; margin-bottom: 10px;
+    }
+    .list-label { font-size: 0.82rem; font-weight: 700; color: #718096; }
+
+    .cards { display: flex; flex-direction: column; gap: 10px; }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 16px 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      animation: slideIn 0.18s ease;
+      cursor: pointer;
+      transition: box-shadow 0.15s;
+    }
+    .card:active { box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .card.past { opacity: 0.55; }
+    .card.today { border: 2px solid #667eea; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-emoji { font-size: 2rem; flex-shrink: 0; width: 48px; text-align: center; }
+
+    .card-body { flex: 1; min-width: 0; }
+    .card-title { font-size: 0.95rem; font-weight: 600; color: #2d3748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-date  { font-size: 0.75rem; color: #a0aec0; margin-top: 2px; }
+
+    .card-days { text-align: right; flex-shrink: 0; }
+    .days-num {
+      font-size: 2.6rem; font-weight: 800; line-height: 1;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .days-num.today-num { font-size: 1.6rem; }
+    .days-label { font-size: 0.72rem; color: #a0aec0; font-weight: 600; }
+
+    .del-btn {
+      background: none; border: none; color: #cbd5e0;
+      font-size: 1.1rem; cursor: pointer; padding: 6px; border-radius: 8px; flex-shrink: 0;
+    }
+    .del-btn:active { color: #fc8181; }
+
+    .empty { text-align: center; color: #a0aec0; font-size: 0.9rem; padding: 40px 0; }
+
+    /* 編集モーダル */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 100;
+      align-items: flex-end; justify-content: center;
+    }
+    .overlay.open { display: flex; }
+
+    .modal {
+      background: #fff; border-radius: 24px 24px 0 0;
+      padding: 24px 20px calc(20px + var(--safe-bottom));
+      width: 100%; max-width: 520px;
+    }
+    .modal-handle { width: 40px; height: 4px; background: #e2e8f0; border-radius: 2px; margin: 0 auto 20px; }
+    .modal h2 { font-size: 1.05rem; font-weight: 700; color: #1a202c; margin-bottom: 16px; }
+    .modal .field label { display: block; font-size: 0.72rem; font-weight: 700; color: #718096; margin-bottom: 4px; text-transform: uppercase; }
+    .modal .field { margin-bottom: 12px; }
+    .modal-footer { display: flex; gap: 8px; margin-top: 16px; }
+    .btn-primary { flex: 1; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 12px; height: 48px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    .btn-ghost { background: #edf2f7; color: #4a5568; border: none; border-radius: 12px; height: 48px; padding: 0 20px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: calc(24px + var(--safe-bottom)); left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748; color: #fff;
+      padding: 11px 18px; border-radius: 10px;
+      font-size: 0.88rem; z-index: 200;
+      opacity: 0; transition: opacity 0.2s; pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⏳ カウントダウン</h1>
+  <button class="notif-btn" id="notifBtn" onclick="requestNotif()" title="通知を許可">🔔</button>
+</header>
+
+<main>
+  <div class="input-card">
+    <h2>イベントを追加</h2>
+    <div class="two-col">
+      <div class="field">
+        <label>タイトル</label>
+        <input type="text" id="titleInput" placeholder="誕生日、旅行…">
+      </div>
+      <div class="field">
+        <label>日付</label>
+        <input type="date" id="dateInput">
+      </div>
+    </div>
+    <div class="field">
+      <label>アイコン</label>
+      <div class="emoji-row" id="emojiRow"></div>
+    </div>
+    <button class="add-btn" onclick="addEvent()">＋ 追加</button>
+  </div>
+
+  <div class="list-header">
+    <div class="list-label" id="listLabel">イベント一覧</div>
+  </div>
+  <div class="cards" id="cards"></div>
+</main>
+
+<!-- 編集モーダル -->
+<div class="overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>✏️ 編集</h2>
+    <div class="field">
+      <label>タイトル</label>
+      <input type="text" id="editTitle">
+    </div>
+    <div class="field">
+      <label>日付</label>
+      <input type="date" id="editDate">
+    </div>
+    <div class="field">
+      <label>アイコン</label>
+      <div class="emoji-row" id="editEmojiRow"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeEdit()">キャンセル</button>
+      <button class="btn-primary" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const EMOJIS = ['🎂','🎉','✈️','🏖️','🎊','🎁','💒','🏥','📅','⭐','🌸','🍀','🎯','🏆','🎶'];
+  const STORAGE_KEY = 'countdown_events';
+
+  let events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  let selectedEmoji = EMOJIS[0];
+  let editId = null;
+  let editSelectedEmoji = EMOJIS[0];
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  }
+
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function daysUntil(dateStr) {
+    const now  = new Date(); now.setHours(0,0,0,0);
+    const target = new Date(dateStr); target.setHours(0,0,0,0);
+    return Math.round((target - now) / 86400000);
+  }
+
+  function fmtDate(d) {
+    const [y, m, day] = d.split('-');
+    return `${y}年${Number(m)}月${Number(day)}日`;
+  }
+
+  function showToast(msg, ms = 3000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), ms);
+  }
+
+  // 絵文字ピッカー生成
+  function buildEmojiRow(containerId, onSelect, currentEmoji) {
+    const row = document.getElementById(containerId);
+    row.innerHTML = '';
+    EMOJIS.forEach(e => {
+      const btn = document.createElement('button');
+      btn.className = 'emoji-btn' + (e === currentEmoji ? ' selected' : '');
+      btn.textContent = e;
+      btn.onclick = () => {
+        row.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        onSelect(e);
+      };
+      row.appendChild(btn);
+    });
+  }
+
+  // 描画
+  function render() {
+    const container = document.getElementById('cards');
+    const label = document.getElementById('listLabel');
+
+    const sorted = [...events].sort((a, b) => {
+      const da = daysUntil(a.date), db = daysUntil(b.date);
+      if (da >= 0 && db >= 0) return da - db;
+      if (da < 0  && db < 0)  return db - da;
+      return da >= 0 ? -1 : 1;
+    });
+
+    label.textContent = `イベント一覧（${events.length}件）`;
+
+    if (sorted.length === 0) {
+      container.innerHTML = '<div class="empty">イベントを追加してください</div>';
+      return;
+    }
+
+    container.innerHTML = sorted.map(ev => {
+      const d = daysUntil(ev.date);
+      let daysHtml;
+      let cardClass = 'card';
+
+      if (d === 0) {
+        cardClass += ' today';
+        daysHtml = `<div class="days-num today-num">🎉</div><div class="days-label">今日！</div>`;
+      } else if (d > 0) {
+        daysHtml = `<div class="days-num">${d}</div><div class="days-label">日後</div>`;
+      } else {
+        cardClass += ' past';
+        daysHtml = `<div class="days-num" style="font-size:1.8rem">${Math.abs(d)}</div><div class="days-label">日経過</div>`;
+      }
+
+      return `
+        <div class="${cardClass}" onclick="openEdit('${ev.id}')">
+          <div class="card-emoji">${ev.emoji}</div>
+          <div class="card-body">
+            <div class="card-title">${esc(ev.title)}</div>
+            <div class="card-date">${fmtDate(ev.date)}</div>
+          </div>
+          <div class="card-days">${daysHtml}</div>
+          <button class="del-btn" onclick="event.stopPropagation(); removeEvent('${ev.id}')" title="削除">✕</button>
+        </div>`;
+    }).join('');
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // 追加
+  function addEvent() {
+    const title = document.getElementById('titleInput').value.trim();
+    const date  = document.getElementById('dateInput').value;
+    if (!title) {
+      document.getElementById('titleInput').classList.add('error');
+      setTimeout(() => document.getElementById('titleInput').classList.remove('error'), 800);
+      return;
+    }
+    if (!date) {
+      document.getElementById('dateInput').classList.add('error');
+      setTimeout(() => document.getElementById('dateInput').classList.remove('error'), 800);
+      return;
+    }
+    events.push({ id: uid(), title, date, emoji: selectedEmoji });
+    save();
+    render();
+    document.getElementById('titleInput').value = '';
+    document.getElementById('dateInput').value = '';
+    showToast('✅ イベントを追加しました');
+  }
+
+  // 削除
+  function removeEvent(id) {
+    if (!confirm('このイベントを削除しますか？')) return;
+    events = events.filter(e => e.id !== id);
+    save();
+    render();
+  }
+
+  // 編集
+  function openEdit(id) {
+    const ev = events.find(e => e.id === id);
+    if (!ev) return;
+    editId = id;
+    editSelectedEmoji = ev.emoji;
+    document.getElementById('editTitle').value = ev.title;
+    document.getElementById('editDate').value  = ev.date;
+    buildEmojiRow('editEmojiRow', e => { editSelectedEmoji = e; }, ev.emoji);
+    document.getElementById('editModal').classList.add('open');
+  }
+
+  function closeEdit() {
+    document.getElementById('editModal').classList.remove('open');
+    editId = null;
+  }
+
+  function saveEdit() {
+    const title = document.getElementById('editTitle').value.trim();
+    const date  = document.getElementById('editDate').value;
+    if (!title || !date) return;
+    const ev = events.find(e => e.id === editId);
+    if (!ev) return;
+    ev.title = title;
+    ev.date  = date;
+    ev.emoji = editSelectedEmoji;
+    save();
+    render();
+    closeEdit();
+    showToast('✅ 保存しました');
+  }
+
+  document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEdit();
+  });
+
+  // ブラウザ通知
+  function updateNotifBtn() {
+    const btn = document.getElementById('notifBtn');
+    if (Notification.permission === 'granted') {
+      btn.textContent = '🔔';
+      btn.title = '通知: ON';
+    } else if (Notification.permission === 'denied') {
+      btn.textContent = '🔕';
+      btn.title = '通知: ブロック中（ブラウザ設定から変更）';
+    } else {
+      btn.textContent = '🔔';
+      btn.title = '通知を許可する';
+    }
+  }
+
+  async function requestNotif() {
+    if (Notification.permission === 'denied') {
+      showToast('ブラウザの設定から通知を許可してください');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    updateNotifBtn();
+    if (perm === 'granted') {
+      showToast('🔔 通知を許可しました');
+      checkTodayNotif();
+    }
+  }
+
+  function checkTodayNotif() {
+    if (Notification.permission !== 'granted') return;
+    const todayEvents = events.filter(e => daysUntil(e.date) === 0);
+    todayEvents.forEach(ev => {
+      new Notification(`${ev.emoji} ${ev.title}`, {
+        body: '今日です！🎉',
+        icon: 'https://zc9yy2.github.io/countdown/icon.png'
+      });
+    });
+  }
+
+  // 初期化
+  buildEmojiRow('emojiRow', e => { selectedEmoji = e; }, selectedEmoji);
+  document.getElementById('dateInput').value = today();
+  updateNotifBtn();
+  render();
+
+  // 起動時に当日チェック
+  if (Notification.permission === 'granted') {
+    checkTodayNotif();
+  } else if (Notification.permission === 'default' && events.length > 0) {
+    setTimeout(() => {
+      if (confirm('当日のイベントをブラウザ通知でお知らせします。通知を許可しますか？')) {
+        requestNotif();
+      }
+    }, 1000);
+  }
+</script>
+</body>
+</html>
