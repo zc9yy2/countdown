@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#667eea">
   <title>カウントダウン</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -246,13 +248,41 @@
     { emoji: '📝', label: '試験' },
   ];
   const STORAGE_KEY = 'countdown_events';
+  const VAPID_PUBLIC_KEY = 'BE3poZ9xbSxjo_bSUXTctJhBq2Wd0Tt1xFhPxD6RLpWdEuG7UJRyAraA51LrDF0DxhN7pqXbMIH53u4s4YQYyZw';
+  const FB_CONFIG = {
+    apiKey: 'AIzaSyDIDWkpikN2dsC4UuEjFs8Ld6oyy7mcTKU',
+    databaseURL: 'https://same-player-default-rtdb.asia-southeast1.firebasedatabase.app',
+  };
+  const DEVICE_ID = (() => {
+    let id = localStorage.getItem('countdown_device_id');
+    if (!id) { id = Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem('countdown_device_id', id); }
+    return id;
+  })();
 
   let events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
   let selectedEmoji = EMOJIS[0].emoji;
   let editId = null;
   let editSelectedEmoji = EMOJIS[0].emoji;
+  let fbReady = false;
+
+  // Firebase 初期化
+  firebase.initializeApp(FB_CONFIG);
+  const db = firebase.database();
+  const eventsRef = db.ref('/countdown/events');
+  const subsRef   = db.ref('/countdown/subscriptions');
+
+  eventsRef.on('value', snap => {
+    const data = snap.val();
+    events = data ? Object.values(data) : [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    fbReady = true;
+    render();
+  });
 
   function save() {
+    const obj = {};
+    events.forEach(e => { obj[e.id] = e; });
+    eventsRef.set(obj);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
   }
 
@@ -418,61 +448,61 @@
     if (e.target === this) closeEdit();
   });
 
-  // ブラウザ通知
+  // Web Push
+  function urlBase64ToUint8Array(b64) {
+    const pad = '='.repeat((4 - b64.length % 4) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+    return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+  }
+
   function updateNotifBtn() {
     const btn = document.getElementById('notifBtn');
     if (Notification.permission === 'granted') {
-      btn.textContent = '🔔';
-      btn.title = '通知: ON';
+      btn.textContent = '🔔'; btn.title = '通知: ON（毎朝8時に自動送信）';
     } else if (Notification.permission === 'denied') {
-      btn.textContent = '🔕';
-      btn.title = '通知: ブロック中（ブラウザ設定から変更）';
+      btn.textContent = '🔕'; btn.title = '通知: ブロック中';
     } else {
-      btn.textContent = '🔔';
-      btn.title = '通知を許可する';
+      btn.textContent = '🔔'; btn.title = '毎日通知を受け取る';
     }
   }
 
   async function requestNotif() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      showToast('このブラウザはWeb Pushに非対応です');
+      return;
+    }
     if (Notification.permission === 'denied') {
       showToast('ブラウザの設定から通知を許可してください');
       return;
     }
-    const perm = await Notification.requestPermission();
-    updateNotifBtn();
-    if (perm === 'granted') {
-      showToast('🔔 通知を許可しました');
-      checkTodayNotif();
-    }
-  }
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js');
+      await navigator.serviceWorker.ready;
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { updateNotifBtn(); return; }
 
-  function checkTodayNotif() {
-    if (Notification.permission !== 'granted') return;
-    const todayEvents = events.filter(e => daysUntil(e.date) === 0);
-    todayEvents.forEach(ev => {
-      new Notification(`${ev.emoji} ${ev.title}`, {
-        body: '今日です！🎉',
-        icon: 'https://zc9yy2.github.io/countdown/icon.png'
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
-    });
+      await subsRef.child(DEVICE_ID).set(sub.toJSON());
+      updateNotifBtn();
+      showToast('🔔 通知を登録しました。毎朝8時にお知らせします');
+    } catch(e) {
+      console.error(e);
+      showToast('通知の登録に失敗しました: ' + e.message);
+    }
   }
 
   // 初期化
   buildEmojiRow('emojiRow', e => { selectedEmoji = e; }, selectedEmoji);
-
   document.getElementById('dateInput').value = today();
   updateNotifBtn();
   render();
 
-  // 起動時に当日チェック
-  if (Notification.permission === 'granted') {
-    checkTodayNotif();
-  } else if (Notification.permission === 'default' && events.length > 0) {
-    setTimeout(() => {
-      if (confirm('当日のイベントをブラウザ通知でお知らせします。通知を許可しますか？')) {
-        requestNotif();
-      }
-    }, 1000);
+  // Service Worker 登録（初回 or 通知許可済みの場合）
+  if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 </script>
 </body>
