@@ -146,6 +146,13 @@
     }
     .del-btn:active { color: #fc8181; }
 
+    .gcal-btn {
+      background: none; border: none; color: #a0aec0;
+      font-size: 1rem; cursor: pointer; padding: 6px; border-radius: 8px; flex-shrink: 0;
+      line-height: 1;
+    }
+    .gcal-btn:active { color: #667eea; }
+
     .empty { text-align: center; color: #a0aec0; font-size: 0.9rem; padding: 40px 0; }
 
     /* 編集モーダル */
@@ -365,6 +372,7 @@
         daysHtml = `<div class="days-num" style="font-size:1.8rem">${Math.abs(d)}</div><div class="days-label">日経過</div>`;
       }
 
+      const gcalHref = gcalUrl(ev.title, ev.date);
       return `
         <div class="${cardClass}" onclick="openEdit('${ev.id}')">
           <div class="card-emoji">${ev.emoji}</div>
@@ -373,6 +381,7 @@
             <div class="card-date">${fmtDate(ev.date)}</div>
           </div>
           <div class="card-days">${daysHtml}</div>
+          <a class="gcal-btn" href="${gcalHref}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Googleカレンダーに追加">📅</a>
           <button class="del-btn" onclick="event.stopPropagation(); removeEvent('${ev.id}')" title="削除">✕</button>
         </div>`;
     }).join('');
@@ -380,6 +389,23 @@
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function gcalUrl(title, dateStr) {
+    const d = dateStr.replace(/-/g, '');
+    const next = dateStr.replace(/-/g, '');
+    const nextDay = new Date(dateStr);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const end = nextDay.toISOString().slice(0,10).replace(/-/g,'');
+    const days = daysUntil(dateStr);
+    const detail = days > 0 ? `あと${days}日` : days === 0 ? '今日！' : `${Math.abs(days)}日前に終了`;
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: title,
+      dates: `${d}/${end}`,
+      details: detail,
+    });
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
   }
 
   // 追加
