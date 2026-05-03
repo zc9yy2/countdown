@@ -240,13 +240,17 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const EMOJIS = ['🎂','🎉','✈️','🏖️','🎊','🎁','💒','🏥','📅','⭐','🌸','🍀','🎯','🏆','🎶'];
+  const EMOJIS = [
+    { emoji: '🎉', label: '祝い' },
+    { emoji: '💑', label: '記念日' },
+    { emoji: '📝', label: '試験' },
+  ];
   const STORAGE_KEY = 'countdown_events';
 
   let events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  let selectedEmoji = EMOJIS[0];
+  let selectedEmoji = EMOJIS[0].emoji;
   let editId = null;
-  let editSelectedEmoji = EMOJIS[0];
+  let editSelectedEmoji = EMOJIS[0].emoji;
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
@@ -282,14 +286,16 @@
   function buildEmojiRow(containerId, onSelect, currentEmoji) {
     const row = document.getElementById(containerId);
     row.innerHTML = '';
-    EMOJIS.forEach(e => {
+    EMOJIS.forEach(({ emoji, label }) => {
       const btn = document.createElement('button');
-      btn.className = 'emoji-btn' + (e === currentEmoji ? ' selected' : '');
-      btn.textContent = e;
+      btn.className = 'emoji-btn' + (emoji === currentEmoji ? ' selected' : '');
+      btn.innerHTML = `<span style="font-size:1.4rem">${emoji}</span><span style="font-size:0.65rem;display:block;color:#718096;margin-top:2px">${label}</span>`;
+      btn.style.width = '64px';
+      btn.style.height = '56px';
       btn.onclick = () => {
         row.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
-        onSelect(e);
+        onSelect(emoji);
       };
       row.appendChild(btn);
     });
@@ -453,6 +459,7 @@
 
   // 初期化
   buildEmojiRow('emojiRow', e => { selectedEmoji = e; }, selectedEmoji);
+
   document.getElementById('dateInput').value = today();
   updateNotifBtn();
   render();
