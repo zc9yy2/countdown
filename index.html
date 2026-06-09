@@ -373,16 +373,17 @@
       }
 
       const gcalHref = gcalUrl(ev.title, ev.date);
+      const safeId = esc(String(ev.id)).replace(/'/g, '');
       return `
-        <div class="${cardClass}" onclick="openEdit('${ev.id}')">
-          <div class="card-emoji">${ev.emoji}</div>
+        <div class="${cardClass}" onclick="openEdit('${safeId}')">
+          <div class="card-emoji">${esc(ev.emoji)}</div>
           <div class="card-body">
             <div class="card-title">${esc(ev.title)}</div>
-            <div class="card-date">${fmtDate(ev.date)}</div>
+            <div class="card-date">${esc(fmtDate(ev.date))}</div>
           </div>
           <div class="card-days">${daysHtml}</div>
-          <a class="gcal-btn" href="${gcalHref}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Googleカレンダーに追加">📅</a>
-          <button class="del-btn" onclick="event.stopPropagation(); removeEvent('${ev.id}')" title="削除">✕</button>
+          <a class="gcal-btn" href="${esc(gcalHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Googleカレンダーに追加">📅</a>
+          <button class="del-btn" onclick="event.stopPropagation(); removeEvent('${safeId}')" title="削除">✕</button>
         </div>`;
     }).join('');
   }
